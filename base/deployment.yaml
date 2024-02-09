@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: step-ca
+spec:
+  replicas: 1
+  template:
+    spec:
+      volumes:
+
+        - name: step-ca-data
+          persistentVolumeClaim:
+            claimName: step-ca-data
+
+        - name: step-ca-config
+          configmMap:
+            name: step-ca-config
+
+        - name: step-ca-password
+          secret:
+            secretName: step-ca-password
+
+      initContainers:
+
+        - name: step-ca-init
+          image: docker.io/smallstep/step-ca:0.25.2
+          envFrom:
+            - configMapRef:
+                name: step-ca-config
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+
+              if ! [ -f /home/step/config/ca.json ]; then
+              step ca init \
+                --name="$STEPCA_INIT_NAME" \
+                --dns="$STEPCA_INIT_DNS_NAMES" \
+                --address=":9000" \
+                --provisioner="$STEPCA_INIT_PROVISIONER_NAME" \
+                --password-file=/passwords/password \
+                --provisioner-password-file=/passwords/password \
+                --remote-management \
+                --admin-subject="$STEPCA_INIT_ADMIN_SUBJECT"
+              fi
+
+              cp /usr/local/bin/step-ca ./step-ca
+          volumeMounts:
+
+            - name: step-ca-data
+              mountPath: /home/step
+
+            - name: step-ca-password
+              mountPath: /passwords
+
+      containers:
+        - name: step-ca
+          image: docker.io/smallstep/step-ca:0.25.2
+          command:
+            - ./step-ca
+            - --password-file=/passwords/password
+            - /home/step/config/ca.json
+          ports:
+            - name: http
+              containerPort: 9000
+          volumeMounts:
+
+            - name: step-ca-data
+              mountPath: /home/step
+
+            - name: step-ca-password
+              mountPath: /passwords

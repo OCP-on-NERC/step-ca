@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: step-ca
+spec:
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: step-ca
+  tls:
+    termination: passthrough
+    insecureEdgeTerminationPolicy: None

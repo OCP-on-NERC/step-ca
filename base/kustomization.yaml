@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: step-ca
+
+labels:
+- includeSelectors: true
+  pairs:
+    app: step-ca
+
+resources:
+- namespace.yaml
+- deployment.yaml
+- pvc.yaml
+- service.yaml
+- route.yaml
+
+configMapGenerator:
+- envs:
+  - step-ca-config.env
+  name: step-ca-config
