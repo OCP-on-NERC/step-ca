@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: step-ca
 spec:
+  strategy:
+    type: Recreate
   replicas: 1
   template:
     spec:
@@ -15,10 +17,6 @@ spec:
         - name: step-ca-config
           configmMap:
             name: step-ca-config
-
-        - name: step-ca-password
-          secret:
-            secretName: step-ca-password
 
       initContainers:
 
@@ -34,32 +32,40 @@ spec:
               set -eu
 
               if ! [ -f /home/step/config/ca.json ]; then
-              step ca init \
-                --name="$STEPCA_INIT_NAME" \
-                --dns="$STEPCA_INIT_DNS_NAMES" \
-                --address=":9000" \
-                --provisioner="$STEPCA_INIT_PROVISIONER_NAME" \
-                --password-file=/passwords/password \
-                --provisioner-password-file=/passwords/password \
-                --remote-management \
-                --admin-subject="$STEPCA_INIT_ADMIN_SUBJECT"
+
+                if [ -z "$STEPCA_INIT_PASSWORD_FILE" ]; then
+                  tr -dc 'A-Za-z0-9!?%=' < /dev/urandom | head -c 30 > password
+                  echo "Your password is: $(cat password)"
+                else
+                  cp "$STEPCA_INIT_PASSWORD_FILE" password
+                fi
+
+                step ca init \
+                  --name="$STEPCA_INIT_NAME" \
+                  --dns="$STEPCA_INIT_DNS_NAMES" \
+                  --address=":9000" \
+                  --provisioner="$STEPCA_INIT_PROVISIONER_NAME" \
+                  --password-file=password \
+                  --provisioner-password-file=password \
+                  --remote-management \
+                  --admin-subject="$STEPCA_INIT_ADMIN_SUBJECT"
+
               fi
 
+              # This is because of a weird EPERM issue trying to run
+              # the binary from /usr/local/bin.
               cp /usr/local/bin/step-ca ./step-ca
           volumeMounts:
 
             - name: step-ca-data
               mountPath: /home/step
 
-            - name: step-ca-password
-              mountPath: /passwords
-
       containers:
         - name: step-ca
           image: docker.io/smallstep/step-ca:0.25.2
           command:
             - ./step-ca
-            - --password-file=/passwords/password
+            - --password-file=password
             - /home/step/config/ca.json
           ports:
             - name: http
@@ -68,6 +74,3 @@ spec:
 
             - name: step-ca-data
               mountPath: /home/step
-
-            - name: step-ca-password
-              mountPath: /passwords
