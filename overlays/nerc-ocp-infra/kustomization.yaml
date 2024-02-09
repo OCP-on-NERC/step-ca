@@ -43,18 +43,3 @@ patches:
               volumeMounts:
                 - name: step-ca-password
                   mountPath: /passwords
-
-          containers:
-            - name: step-ca
-              image: docker.io/smallstep/step-ca:0.25.2
-              command:
-                - ./step-ca
-                - --password-file=password
-                - /home/step/config/ca.json
-              ports:
-                - name: http
-                  containerPort: 9000
-              volumeMounts:
-
-                - name: step-ca-data
-                  mountPath: /home/step
